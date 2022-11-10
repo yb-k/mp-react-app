@@ -1,70 +1,234 @@
-# Getting Started with Create React App
+# Mp React App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Morpheus + React + Kakao Map 간단 샘플입니다.
 
-## Available Scripts
+## 설치
 
-In the project directory, you can run:
+```bash
+yarn install
 
-### `npm start`
+yarn run start
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 사용 라이브러리
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+> Create-React-App
 
-### `npm test`
+> [react-kakao-maps-sdk](https://react-kakao-maps-sdk.jaeseokim.dev/)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 가이드
 
-### `npm run build`
+1. [kakao developer](https://developers.kakao.com/) 가입 / 앱 생성
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+2. 플랫폼 - Web - 사이트 도메인 등록
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+   `http://127.0.0.1:3000`
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+   `http://192.168.0.2:3000` <- 앱에서 실행한 도메인이 되어야한다.
 
-### `npm run eject`
+3. JS 라이브러리 적용
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+   앱 키 - JavasScript 의 키를 복사하여 아래의 `APP_KEY`에 대체한다.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+`public/index.html`
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```html
+<script
+  type="text/javascript"
+  src="//dapi.kakao.com/v2/maps/sdk.js?appkey=APP_KEY&libraries=services,clusterer,drawing"
+></script>
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+> 만약 웹에서 401 에러가 발생되는 경우 앱키 또는 2번의 도메인이 다르기때문에 발생된다.
 
-## Learn More
+4. `react-kakao-maps-sdk` 설치
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+yarn add react-kakao-maps-sdk
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+5. 컴포넌트 작성
 
-### Code Splitting
+`src/components/KakaoMap.jsx`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```jsx
+import { useEffect, useState } from "react";
+import { Map, MapMarker } from "react-kakao-maps-sdk";
 
-### Analyzing the Bundle Size
+const KakaoMap = () => {
+  const [center, setCenter] = useState({
+    lat: 33.5563,
+    lng: 126.79581,
+  });
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+  return (
+    <Map center={center} style={{ width: "100%", height: "360px" }}>
+      <MapMarker position={center}>
+        <div style={{ color: "#000" }}>im here!</div>
+      </MapMarker>
+    </Map>
+  );
+};
 
-### Making a Progressive Web App
+export default KakaoMap;
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+6. Morpheus API 모듈화
 
-### Advanced Configuration
+`src/native/index.js`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```js
+// Eslint 사용시 globals에 "M"추가
+const M = window.M;
+export default M;
+```
 
-### Deployment
+7. 좌표가져오는 API 작성
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+`src/native/location.js`
 
-### `npm run build` fails to minify
+```js
+import M from "./";
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+const coordsApadter = ({ latitude, longitude }) => {
+  return {
+    lat: Number(latitude),
+    lng: Number(longitude),
+  };
+};
+
+export const getCurrentLocation = () => {
+  return new Promise((resolve, reject) => {
+    M.plugin("location").current({
+      timeout: 10000,
+      maximumAge: 1,
+      callback: function ({ status, message, coords }) {
+        if (status === "SUCCESS" && coords) {
+          // 성공
+          resolve(coordsApadter(coords));
+        } else {
+          // 실패
+          reject(new Error("Getting GPS coords is failed"));
+        }
+      },
+    });
+  });
+};
+```
+
+8. 컴포넌트 마운트 시점에 현재좌표를 가져오기
+
+`src/components/KakaoMap.jsx`
+
+```jsx
+import { useEffect, useState } from "react";
+import { Map, MapMarker } from "react-kakao-maps-sdk";
+import { getCurrentLocation } from "../native/location";
+
+const KakaoMap = () => {
+  const [center, setCenter] = useState({
+    lat: 33.5563,
+    lng: 126.79581,
+  });
+
+  useEffect(() => {
+    getCurrentLocation().then(({ lat, lng }) => {
+      console.log(lng, lat);
+      setCenter({
+        lat,
+        lng,
+      });
+    });
+  }, []);
+  return (
+    <Map center={center} style={{ width: "100%", height: "360px" }}>
+      <MapMarker position={center}>
+        <div style={{ color: "#000" }}>im here!</div>
+      </MapMarker>
+    </Map>
+  );
+};
+
+export default KakaoMap;
+```
+
+9. 런타임 환경에 따른 API 분기처리
+
+`src/common/constants.js`
+
+```js
+export const APP_ENV = {
+  APP: "app", // morpheus 앱으로 접속 시 경우
+  BROWSER: "browser", // 크로스 플랫폼으로 일반 web도 지원하는 경우
+};
+
+// 모피어스 앱 내 개발환경
+export const OS_ENV = {
+  IOS: "ios", // ios
+  ANDROID: "android", // android
+  UNKOWN: "unknown",
+};
+```
+
+`src/common/cofing.js`
+
+```js
+import { APP_ENV, OS_ENV } from "./constants";
+const initRunTimeEnv = () => {
+  let OS;
+  const userAgent = window.navigator.userAgent;
+  const TYPE = /morpheus/i.test(userAgent) ? APP_ENV.APP : APP_ENV.BROWSER;
+  if (/android/i.test(userAgent)) {
+    OS = OS_ENV.ANDROID;
+  } else if (/ipad|iphone|ipod/i.test(userAgent) && !window.MSStream) {
+    // iOS detection from: http://stackoverflow.com/a/9039885/177710
+    OS = OS_ENV.IOS;
+  } else {
+    OS = OS_ENV.UNKOWN;
+  }
+  return {
+    TYPE,
+    OS,
+  };
+};
+
+export const RUNTIME = initRunTimeEnv();
+```
+
+`src/native/location.js`
+
+```js
+import { RUNTIME } from "../common/config";
+import { APP_ENV } from "../common/constants";
+import M from "./";
+
+const coordsApadter = ({ latitude, longitude }) => {
+  return {
+    lat: Number(latitude),
+    lng: Number(longitude),
+  };
+};
+
+export const getCurrentLocation = () => {
+  return new Promise((resolve, reject) => {
+    if (RUNTIME.TYPE === APP_ENV.BROWSER) {
+      console.warn("[getCurrentLocation] function is only for Morpheus App");
+      resolve({}); // 넘어가기 또는 기본값 세팅
+    } else {
+      M.plugin("location").current({
+        timeout: 10000,
+        maximumAge: 1,
+        callback: function ({ status, message, coords }) {
+          if (status === "SUCCESS" && coords) {
+            // 성공
+            resolve(coordsApadter(coords));
+          } else {
+            // 실패
+            reject(new Error("Getting GPS coords is failed"));
+          }
+        },
+      });
+    }
+  });
+};
+```
