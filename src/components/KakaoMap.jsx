@@ -11,10 +11,12 @@ const KakaoMap = () => {
   useEffect(() => {
     getCurrentLocation().then(({ lat, lng }) => {
       console.log(lng, lat);
-      setCenter({
-        lat,
-        lng,
-      });
+      if (lng && lat) {
+        setCenter({
+          lat,
+          lng,
+        });
+      }
     });
   }, []);
   return (
